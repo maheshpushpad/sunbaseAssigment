@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Customer Management</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+
+<body>
+    <!-- Login Screen -->
+    <div id="login-screen" class="screen" style="background-color: #fff; padding: 40px; border-radius: 10px; box-shadow: 0 10px 20px rgba(0, 0, 0, 0.1); text-align: center; width: 100%; max-width: 400px; margin: 100px auto; font-family: 'Arial', sans-serif; animation: fadeIn 1s ease-in-out;">
+        <h2 style="margin-bottom: 20px; font-size: 24px; color: #333;">Welcome Back</h2>
+        <p style="margin-bottom: 20px; color: #666;">Please login to manage customers</p>
+        <input type="text" id="username" placeholder="Username" style="width: 100%; padding: 12px; margin-bottom: 20px; border: 1px solid #ccc; border-radius: 5px; font-size: 16px; box-sizing: border-box; transition: border-color 0.3s;">
+        <input type="password" id="password" placeholder="Password" style="width: 100%; padding: 12px; margin-bottom: 20px; border: 1px solid #ccc; border-radius: 5px; font-size: 16px; box-sizing: border-box; transition: border-color 0.3s;">
+        <button onclick="login()" style="width: 100%; padding: 12px; background-color: #1c92d2; border: none; border-radius: 5px; font-size: 16px; color: #fff; cursor: pointer; transition: background-color 0.3s;">Login</button>
+        <p id="login-error" class="error" style="color: #e74c3c; margin-top: 10px;"></p>
+    </div>
+    
+    <style>
+        body {
+            background: linear-gradient(to right, #1c92d2, #f2fcfe);
+            height: 100vh;
+            margin: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+        
+        input[type="text"]:focus, input[type="password"]:focus {
+            border-color: #1c92d2;
+            outline: none;
+        }
+        
+        button:hover {
+            background-color: #1171a6;
+        }
+        
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(-20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+    </style>
+    
+    <!-- Customer List Screen -->
+    <div id="customer-list-screen" class="screen" style="display:none;">
+        <h2>Customer List</h2>
+        <button class="add-btn" onclick="showAddCustomerForm()">+ Add Customer</button>
+        <table id="customer-table">
+            <thead>
+                <tr>
+                    <th>First Name</th>
+                    <th>Last Name</th>
+                    <th>Email</th>
+                    <th>Phone</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                <!-- Customers will be dynamically loaded here -->
+            </tbody>
+        </table>
+    </div>
+
+    <!-- Customer Form Screen -->
+    <div id="customer-form-screen" class="screen" style="display:none;">
+        <h2 id="form-title">Add Customer</h2>
+        <input type="text" id="firstName" placeholder="First Name">
+        <input type="text" id="lastName" placeholder="Last Name">
+        <input type="text" id="street" placeholder="Street">
+        <input type="text" id="address" placeholder="Address">
+        <input type="text" id="city" placeholder="City">
+        <input type="text" id="state" placeholder="State">
+        <input type="email" id="email" placeholder="Email">
+        <input type="text" id="phone" placeholder="Phone">
+        <button class="save-btn" onclick="saveCustomer()">Save</button>
+        <button class="cancel-btn" onclick="showCustomerList()">Cancel</button>
+    </div>
+
+    <script>
+        let jwtToken = '';
+        let editCustomerId = null;
+
+        function login() {
+            const username = document.getElementById('username').value;
+            const password = document.getElementById('password').value;
+
+            fetch('http://localhost:8080/authenticate', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ username, password })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.token) {
+                    jwtToken = data.token;
+                    showCustomerList();
+                } else {
+                    document.getElementById('login-error').innerText = 'Invalid credentials';
+                }
+            })
+            .catch(error => console.error('Error:', error));
+        }
+
+        function showCustomerList() {
+            document.getElementById('login-screen').style.display = 'none';
+            document.getElementById('customer-list-screen').style.display = 'block';
+            document.getElementById('customer-form-screen').style.display = 'none';
+
+            fetch('http://localhost:8080/api/customers', {
+                headers: {
+                    'Authorization': 'Bearer ' + jwtToken
+                }
+            })
+            .then(response => response.json())
+            .then(data => {
+                const tableBody = document.getElementById('customer-table').querySelector('tbody');
+                tableBody.innerHTML = '';
+
+                data.content.forEach(customer => {
+                    const row = `<tr>
+                        <td>${customer.firstName}</td>
+                        <td>${customer.lastName}</td>
+                        <td>${customer.email}</td>
+                        <td>${customer.phone}</td>
+                        <td>
+                            <button onclick="editCustomer(${customer.id})">Edit</button>
+                            <button onclick="deleteCustomer(${customer.id})">Delete</button>
+                        </td>
+                    </tr>`;
+                    tableBody.innerHTML += row;
+                });
+            })
+            .catch(error => console.error('Error:', error));
+        }
+
+        function showAddCustomerForm() {
+            document.getElementById('customer-list-screen').style.display = 'none';
+            document.getElementById('customer-form-screen').style.display = 'block';
+            document.getElementById('form-title').innerText = 'Add Customer';
+            clearForm();
+            editCustomerId = null;
+        }
+
+        function saveCustomer() {
+            const customer = {
+                firstName: document.getElementById('firstName').value,
+                lastName: document.getElementById('lastName').value,
+                street: document.getElementById('street').value,
+                address: document.getElementById('address').value,
+                city: document.getElementById('city').value,
+                state: document.getElementById('state').value,
+                email: document.getElementById('email').value,
+                phone: document.getElementById('phone').value
+            };
+
+            let url = 'http://localhost:8080/api/customers';
+            let method = 'POST';
+
+            if (editCustomerId) {
+                url = `http://localhost:8080/api/customers/${editCustomerId}`;
+                method = 'PUT';
+            }
+
+            fetch(url, {
+                method: method,
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': 'Bearer ' + jwtToken
+                },
+                body: JSON.stringify(customer)
+            })
+            .then(response => response.json())
+            .then(data => {
+                showCustomerList();
+            })
+            .catch(error => console.error('Error:', error));
+        }
+
+        function editCustomer(id) {
+            fetch(`http://localhost:8080/api/customers/${id}`, {
+                headers: {
+                    'Authorization': 'Bearer ' + jwtToken
+                }
+            })
+            .then(response => response.json())
+            .then(customer => {
+                editCustomerId = customer.id;
+                document.getElementById('customer-list-screen').style.display = 'none';
+                document.getElementById('customer-form-screen').style.display = 'block';
+                document.getElementById('form-title').innerText = 'Edit Customer';
+                document.getElementById('firstName').value = customer.firstName;
+                document.getElementById('lastName').value = customer.lastName;
+                document.getElementById('street').value = customer.street;
+                document.getElementById('address').value = customer.address;
+                document.getElementById('city').value = customer.city;
+                document.getElementById('state').value = customer.state;
+                document.getElementById('email').value = customer.email;
+                document.getElementById('phone').value = customer.phone;
+            })
+            .catch(error => console.error('Error:', error));
+        }
+
+        function deleteCustomer(id) {
+            fetch(`http://localhost:8080/api/customers/${id}`, {
+                method: 'DELETE',
+                headers: {
+                    'Authorization': 'Bearer ' + jwtToken
+                }
+            })
+            .then(response => {
+                showCustomerList();
+            })
+            .catch(error => console.error('Error:', error));
+        }
+
+        function clearForm() {
+            document.getElementById('firstName').value = '';
+            document.getElementById('lastName').value = '';
+            document.getElementById('street').value = '';
+            document.getElementById('address').value = '';
+            document.getElementById('city').value = '';
+            document.getElementById('state').value = '';
+            document.getElementById('email').value = '';
+            document.getElementById('phone').value = '';
+        }
+    </script>
+</body>
+
+</html>
